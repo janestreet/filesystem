@@ -11,12 +11,13 @@ build: [
 ]
 depends: [
   "ocaml" {>= "5.1.0"}
-  "async"
+  "async_kernel"
+  "async_unix"
   "core"
   "core_unix"
   "file_path"
   "ppx_jane"
-  "dune"      {>= "3.11.0"}
+  "dune"         {>= "3.11.0"}
 ]
 available: arch != "arm32" & arch != "x86_32"
 synopsis: "A library for filesystem operations with the file_path library."

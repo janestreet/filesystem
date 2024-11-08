@@ -266,6 +266,12 @@ module type S = sig
     -> File_path.t
     -> Flock.t IO.t
 
+  (** Like [flock] above. Uses an already-open file descriptor for locking. *)
+  val flock_of_fd
+    :  ?shared:bool (** default: false, i.e. exclusive *)
+    -> Fd.t
+    -> Flock.t IO.t
+
   (** Like [flock] above. If the file does not exist, creates it with the given
       permissions before locking. *)
   val flock_create
@@ -281,6 +287,12 @@ module type S = sig
     -> File_path.t
     -> Flock.t option IO.t
 
+  (** Like [try_flock] above. Uses an already-open file descriptor for locking. *)
+  val try_flock_of_fd
+    :  ?shared:bool (** default: false, i.e. exclusive *)
+    -> Fd.t
+    -> Flock.t option IO.t
+
   (** Like [try_flock] above. If the file does not exist, creates it with the given
       permissions before locking. *)
   val try_flock_create
@@ -291,7 +303,7 @@ module type S = sig
 
   (** Releases the given lock. These locks are automatically released on [exit] or [exec],
       so this only needs to be used if the lock needs to be released during the execution
-      of the program. *)
+      of the program. Does not close any file descriptors passed to [*_of_fd] creators. *)
   val funlock : Flock.t -> unit IO.t
 
   (** Produces the file descriptor underlying a lock. *)
@@ -302,6 +314,13 @@ module type S = sig
   val with_flock
     :  ?shared:bool (** default: false, i.e. exclusive *)
     -> File_path.t
+    -> f:(Flock.t -> 'a IO.t)
+    -> 'a IO.t
+
+  (** Like [with_flock]. Uses an already-open file descriptor for locking. *)
+  val with_flock_of_fd
+    :  ?shared:bool (** default: false, i.e. exclusive *)
+    -> Fd.t
     -> f:(Flock.t -> 'a IO.t)
     -> 'a IO.t
 

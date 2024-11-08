@@ -332,8 +332,12 @@ include struct
   end
 
   module Flock = struct
-    (** An open, locked file descriptor. Closing the file descriptor releases the lock. *)
-    type t = { fd : Fd.t } [@@unboxed]
+    (** An open, locked file descriptor. Closing the file descriptor releases the lock iff
+        [close_upon_funlock]. *)
+    type t =
+      { fd : Fd.t
+      ; close_upon_funlock : bool
+      }
   end
 
   open Flock
@@ -358,10 +362,18 @@ include struct
     else Core_unix.Flock_command.lock_exclusive
   ;;
 
+  let flock_of_fd_internal fd ~close_upon_funlock ~shared =
+    Core_unix.flock_blocking fd (flock_command ~shared);
+    { fd; close_upon_funlock }
+  ;;
+
   let flock_internal ~create ~shared path =
     let fd = open_for_flock path ~create in
-    Core_unix.flock_blocking fd (flock_command ~shared);
-    { fd }
+    flock_of_fd_internal fd ~close_upon_funlock:true ~shared
+  ;;
+
+  let flock_of_fd ?(shared = false) fd =
+    flock_of_fd_internal fd ~close_upon_funlock:false ~shared
   ;;
 
   let flock ?(shared = false) path = flock_internal ~create:None ~shared path
@@ -370,9 +382,21 @@ include struct
     flock_internal ~create:(Some perm) ~shared path
   ;;
 
+  let try_flock_of_fd_internal fd ~close_upon_funlock ~shared =
+    match Core_unix.flock fd (flock_command ~shared) with
+    | true -> Some { fd; close_upon_funlock }
+    | false ->
+      if close_upon_funlock then Core_unix.close fd;
+      None
+  ;;
+
   let try_flock_internal ~create ~shared path =
     let fd = open_for_flock path ~create in
-    if Core_unix.flock fd (flock_command ~shared) then Some { fd } else None
+    try_flock_of_fd_internal fd ~close_upon_funlock:true ~shared
+  ;;
+
+  let try_flock_of_fd ?(shared = false) fd =
+    try_flock_of_fd_internal fd ~close_upon_funlock:false ~shared
   ;;
 
   let try_flock ?(shared = false) path = try_flock_internal ~create:None ~shared path
@@ -381,12 +405,26 @@ include struct
     try_flock_internal ~create:(Some perm) ~shared path
   ;;
 
-  let funlock { fd } = Core_unix.close fd ~restart:true
+  let funlock { fd; close_upon_funlock } =
+    match close_upon_funlock with
+    | true -> Core_unix.close fd ~restart:true
+    | false -> Core_unix.flock_blocking fd Core_unix.Flock_command.unlock
+  ;;
+
   let flock_fd t = t.fd
 
-  let with_flock_internal ~create ~shared path ~f =
-    let t = flock_internal ~create ~shared path in
+  let with_flock_of_fd_internal fd ~close_upon_funlock ~shared ~f =
+    let t = flock_of_fd_internal fd ~close_upon_funlock ~shared in
     Exn.protectx t ~f ~finally:funlock
+  ;;
+
+  let with_flock_internal ~create ~shared path ~f =
+    let fd = open_for_flock path ~create in
+    with_flock_of_fd_internal fd ~close_upon_funlock:true ~shared ~f
+  ;;
+
+  let with_flock_of_fd ?(shared = false) fd ~f =
+    with_flock_of_fd_internal fd ~close_upon_funlock:false ~shared ~f
   ;;
 
   let with_flock ?(shared = false) path ~f =

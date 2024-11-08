@@ -1,5 +1,6 @@
 open! Core
-open! Async
+open! Async_kernel
+open! Async_unix
 include Filesystem_types
 
 open struct
@@ -341,7 +342,10 @@ include struct
   module Fd = Fd
 
   module Flock = struct
-    type t = { fd : Fd.t } [@@unboxed]
+    type t =
+      { fd : Fd.t
+      ; close_upon_funlock : bool
+      }
   end
 
   open Flock
@@ -359,42 +363,79 @@ include struct
 
   let flock_command ~shared : Unix.Lock_mode.t = if shared then Shared else Exclusive
 
+  let flock_of_fd_internal fd ~close_upon_funlock ~shared =
+    let%bind () = Unix.flock fd (flock_command ~shared) in
+    return { fd; close_upon_funlock }
+  ;;
+
   let flock_internal ~create ~shared path =
     let%bind fd = flock_open path ~create in
-    let%bind () = Unix.flock fd (flock_command ~shared) in
-    return { fd }
+    flock_of_fd_internal fd ~close_upon_funlock:true ~shared
   ;;
 
   let flock ?(shared = false) path = flock_internal ~create:None ~shared path
+
+  let flock_of_fd ?(shared = false) fd =
+    flock_of_fd_internal fd ~close_upon_funlock:false ~shared
+  ;;
 
   let flock_create ?(perm = File_permissions.u_rw) ?(shared = false) path =
     flock_internal ~create:(Some perm) ~shared path
   ;;
 
+  let try_flock_of_fd_internal fd ~close_upon_funlock ~shared =
+    (* [Async.Unix.try_flock] pretends to be non-blocking, but blocks on NFS. *)
+    match%bind In_thread.run (fun () -> Unix.try_flock fd (flock_command ~shared)) with
+    | true -> return (Some { fd; close_upon_funlock })
+    | false ->
+      (match close_upon_funlock with
+       | false -> return None
+       | true ->
+         let%map () = Unix.close fd in
+         None)
+  ;;
+
   let try_flock_internal ~create ~shared path =
     let%bind fd = flock_open path ~create in
-    (* [Async.Unix.try_flock] pretends to be non-blocking, but blocks on NFS. *)
-    if%map In_thread.run (fun () -> Unix.try_flock fd (flock_command ~shared))
-    then Some { fd }
-    else None
+    try_flock_of_fd_internal fd ~close_upon_funlock:true ~shared
   ;;
 
   let try_flock ?(shared = false) path = try_flock_internal ~create:None ~shared path
+
+  let try_flock_of_fd ?(shared = false) fd =
+    try_flock_of_fd_internal fd ~close_upon_funlock:true ~shared
+  ;;
 
   let try_flock_create ?(perm = File_permissions.u_rw) ?(shared = false) path =
     try_flock_internal ~create:(Some perm) ~shared path
   ;;
 
-  let funlock { fd } = Unix.close fd
+  let funlock { fd; close_upon_funlock } =
+    match close_upon_funlock with
+    | true -> Unix.close fd
+    | false ->
+      (* [Async.Unix.funlock] pretends to be non-blocking, but blocks on NFS. *)
+      In_thread.run (fun () -> Unix.funlock fd)
+  ;;
+
   let flock_fd t = t.fd
 
-  let with_flock_internal ~create ~shared path ~f =
-    let%bind t = flock_internal ~create ~shared path in
+  let with_flock_of_fd_internal fd ~close_upon_funlock ~shared ~f =
+    let%bind t = flock_of_fd_internal fd ~close_upon_funlock ~shared in
     Monitor.protect (fun () -> f t) ~finally:(fun () -> funlock t)
+  ;;
+
+  let with_flock_internal ~create ~shared path ~f =
+    let%bind fd = flock_open path ~create in
+    with_flock_of_fd_internal fd ~close_upon_funlock:true ~shared ~f
   ;;
 
   let with_flock ?(shared = false) path ~f =
     with_flock_internal ~create:None ~shared path ~f
+  ;;
+
+  let with_flock_of_fd ?(shared = false) fd ~f =
+    with_flock_of_fd_internal ~close_upon_funlock:false ~shared fd ~f
   ;;
 
   let with_flock_create ?(perm = File_permissions.u_rw) ?(shared = false) path ~f =
