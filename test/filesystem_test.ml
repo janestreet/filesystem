@@ -29,9 +29,17 @@ module type IO = sig
 
   (** Convert deferred computations to I/O. *)
   val of_async : (unit -> 'a Deferred.t) -> 'a t
+
+  module Fd : sig
+    type t
+  end
+
+  val with_fd : File_path.t -> f:(Fd.t -> 'a t) -> 'a t
 end
 
-module Test_filesystem (IO : IO) (Fs : Filesystem.S with module IO := IO) :
+module Test_filesystem
+    (IO : IO)
+    (Fs : Filesystem.S with module IO := IO and type Fd.t = IO.Fd.t) :
   Filesystem.S with module IO := IO = struct
   let executable_name = Fs.executable_name
 
@@ -1111,8 +1119,10 @@ module Test_filesystem (IO : IO) (Fs : Filesystem.S with module IO := IO) :
   end
 
   let flock = Fs.flock
+  let flock_of_fd = Fs.flock_of_fd
   let flock_create = Fs.flock_create
   let try_flock = Fs.try_flock
+  let try_flock_of_fd = Fs.try_flock_of_fd
   let try_flock_create = Fs.try_flock_create
   let funlock = Fs.funlock
 
@@ -1253,13 +1263,32 @@ module Test_filesystem (IO : IO) (Fs : Filesystem.S with module IO := IO) :
           error_s [%message "locked multiple times" (count : int)]))
   ;;
 
+  open struct
+    module With_flock_kind = struct
+      type t =
+        | With_flock
+        | With_flock_create
+        | With_flock_of_fd
+      [@@deriving enumerate]
+
+      let to_fn = function
+        | With_flock -> Fs.with_flock
+        | With_flock_create -> Fs.with_flock_create ?perm:None
+        | With_flock_of_fd ->
+          fun ?shared file_path ~f ->
+            IO.with_fd file_path ~f:(fun fd -> Fs.with_flock_of_fd ?shared fd ~f)
+      ;;
+    end
+  end
+
   let with_flock = Fs.with_flock
   let with_flock_create = Fs.with_flock_create
+  let with_flock_of_fd = Fs.with_flock_of_fd
 
   let%expect_test "[with_flock]" =
-    Deferred.List.iter ~how:`Sequential Bool.all ~f:(fun create ->
+    Deferred.List.iter ~how:`Sequential With_flock_kind.all ~f:(fun kind ->
       within_temp_dir (fun () ->
-        let with_f = if create then with_flock_create ?perm:None else with_flock in
+        let with_f = With_flock_kind.to_fn kind in
         let with_ name f =
           IO.async (fun () ->
             with_f ?/"file" ~f:(fun _ ->
@@ -1278,7 +1307,11 @@ module Test_filesystem (IO : IO) (Fs : Filesystem.S with module IO := IO) :
                   return value)))
           |> Deferred.join
         in
-        let%bind () = if create then return () else run "touch" [ "file" ] in
+        let%bind () =
+          match kind with
+          | With_flock | With_flock_of_fd -> run "touch" [ "file" ]
+          | With_flock_create -> return ()
+        in
         let%bind () =
           with_ "lock1" (fun _ ->
             with_ "lock2" (fun _ ->
@@ -1496,6 +1529,10 @@ module Test_filesystem_core =
 
       let async f = In_thread.run f
       let of_async f = Thread_safe.block_on_async_exn f
+
+      module Fd = Core_unix.File_descr
+
+      let with_fd path ~f = Core_unix.with_file ?/$path ~mode:[ O_RDWR; O_CREAT ] ~f
     end)
     (Filesystem_core)
 
@@ -1506,5 +1543,9 @@ module Test_filesystem_async =
 
       let async f = f ()
       let of_async f = f ()
+
+      module Fd = Unix.Fd
+
+      let with_fd path ~f = Unix.with_file ?/$path ~mode:[ `Rdwr; `Creat ] ~f
     end)
     (Filesystem_async)
