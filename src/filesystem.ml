@@ -82,8 +82,8 @@ module type S = sig
 
       These functions abstract over either [Core_unix] or [Async.Unix]. *)
 
-  (** Please note that [rmdir] raises on a non-empty directory. If you want to delete
-      a directory and all of its contents, see [rm]. *)
+  (** Please note that [rmdir] raises on a non-empty directory. If you want to delete a
+      directory and all of its contents, see [rm]. *)
   val rmdir : File_path.t -> unit IO.t
 
   val chdir : File_path.t -> unit IO.t
