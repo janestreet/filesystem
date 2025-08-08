@@ -8,6 +8,8 @@ module type S = sig
     File_stats.S
     with module File_kind := File_kind
      and module File_permissions := File_permissions
+
+  module On_cleanup_error : On_cleanup_error.S
 end
 
 module type Filesystem_types = sig
@@ -18,4 +20,5 @@ module type Filesystem_types = sig
     with module File_kind = File_kind
      and module File_permissions = File_permissions
      and module File_stats = File_stats
+     and module On_cleanup_error = On_cleanup_error
 end

@@ -1435,7 +1435,7 @@ module Test_filesystem
 
     (* Test a [with] function for temporary files. *)
     let test_with f ~expect_directory ~remove =
-      let f = wrap f in
+      let f = wrap (fun ?in_dir -> f ?in_dir ?on_cleanup_error:None) in
       with_umasks (fun ~umask ->
         (* Create an outer temporary directory using expect test helpers. *)
         with_temp_dir (fun in_dir ->
@@ -1500,16 +1500,19 @@ module Test_filesystem
 
   let%expect_test "[within_temp_dir]" =
     let test ~remove =
-      test_with ~expect_directory:true ~remove (fun ?in_dir ?perm ?prefix ?suffix f ->
-        let open IO.Let_syntax in
-        let above = Sys_unix.getcwd () in
-        let%map result =
-          within_temp_dir ?in_dir ?perm ?prefix ?suffix (fun () ->
-            f (File_path.Absolute.of_string (Sys_unix.getcwd ())))
-        in
-        let below = Sys_unix.getcwd () in
-        require_equal (module String) above below;
-        result)
+      test_with
+        ~expect_directory:true
+        ~remove
+        (fun ?in_dir ?on_cleanup_error ?perm ?prefix ?suffix f ->
+           let open IO.Let_syntax in
+           let above = Sys_unix.getcwd () in
+           let%map result =
+             within_temp_dir ?on_cleanup_error ?in_dir ?perm ?prefix ?suffix (fun () ->
+               f (File_path.Absolute.of_string (Sys_unix.getcwd ())))
+           in
+           let below = Sys_unix.getcwd () in
+           require_equal (module String) above below;
+           result)
     in
     let%bind () = test ~remove:false in
     [%expect {| |}];

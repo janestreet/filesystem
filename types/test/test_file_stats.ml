@@ -3,7 +3,7 @@ open Expect_test_helpers_core
 open Filesystem_types
 
 include struct
-  type t = File_stats.t [@@deriving equal, quickcheck, sexp_of]
+  type t = File_stats.t [@@deriving equal ~localize, quickcheck, sexp_of]
 end
 
 type t = File_stats.t =

@@ -13,7 +13,7 @@ include (
       | Regular
       | Socket
       | Symlink
-    [@@deriving compare, enumerate, equal, hash, quickcheck, sexp_of]
+    [@@deriving compare ~localize, enumerate, equal ~localize, hash, quickcheck, sexp_of]
   end)
 
 let%expect_test "[sexp_of_t]" =

@@ -10,7 +10,7 @@ module type S = sig
     | Regular
     | Socket
     | Symlink
-  [@@deriving compare, enumerate, equal, hash, quickcheck, sexp_of]
+  [@@deriving compare ~localize, enumerate, equal ~localize, hash, quickcheck, sexp_of]
 
   (** Conversions *)
 

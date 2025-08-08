@@ -180,22 +180,40 @@ include struct
          suffix)
   ;;
 
-  let internal_with_temp_file ~in_dir ~perm ~prefix ~suffix f =
+  let with_cleanup ~on_cleanup_error path ~f ~cleanup =
+    Exn.protectx ~f path ~finally:(fun path ->
+      try cleanup path with
+      | exn ->
+        let backtrace = Backtrace.Exn.most_recent_for_exn exn in
+        On_cleanup_error.on_cleanup_error
+          on_cleanup_error
+          ~backtrace
+          ~exn
+          ~log_s:eprint_s
+          ~path
+          ~return:Fn.id)
+    [@nontail]
+  ;;
+
+  let internal_with_temp_file ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix f =
     let path = internal_create_temp_file ~in_dir ~perm ~prefix ~suffix () in
-    Exn.protectx path ~f ~finally:(fun path ->
+    with_cleanup ~on_cleanup_error path ~f ~cleanup:(fun path ->
       (* delete the temp file, ok if it was already deleted *)
       try unlink (File_path.of_absolute path) with
       | Unix.Unix_error (ENOENT, _, _) -> ())
   ;;
 
-  let internal_with_temp_dir ~in_dir ~perm ~prefix ~suffix f =
+  let internal_with_temp_dir ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix f =
     let path = internal_create_temp_dir ~in_dir ~perm ~prefix ~suffix () in
-    Exn.protectx path ~f ~finally:(fun path ->
-      File_path.of_absolute path |> rm ~recursive:true)
+    with_cleanup
+      path
+      ~f
+      ~cleanup:(fun path -> File_path.of_absolute path |> rm ~recursive:true)
+      ~on_cleanup_error
   ;;
 
-  let internal_within_temp_dir ~in_dir ~perm ~prefix ~suffix f =
-    internal_with_temp_dir ~in_dir ~perm ~prefix ~suffix (fun path ->
+  let internal_within_temp_dir ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix f =
+    internal_with_temp_dir ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix (fun path ->
       let prev = getcwd () in
       chdir (path :> File_path.t);
       Exn.protect ~f ~finally:(fun () ->
@@ -206,18 +224,11 @@ include struct
   (* We wrap the internal functions with optional arguments uniformly. *)
 
   let wrap f ~default_perm =
-    stage (fun ?in_dir ?perm ?prefix ?suffix arg ->
+    stage (fun ?in_dir ?(perm = default_perm) ?(prefix = "") ?(suffix = "") arg ->
       let in_dir =
-        let path =
-          match in_dir with
-          | Some dir -> dir
-          | None -> force default_temp_dir
-        in
-        make_absolute_under_cwd path
+        Option.value_or_thunk in_dir ~default:(fun () -> force default_temp_dir)
+        |> make_absolute_under_cwd
       in
-      let perm = Option.value perm ~default:default_perm in
-      let prefix = Option.value prefix ~default:"" in
-      let suffix = Option.value suffix ~default:"" in
       f ~in_dir ~perm ~prefix ~suffix arg)
   ;;
 
@@ -231,16 +242,39 @@ include struct
 
   (* We have to eta-expand the polymorphic functions. *)
 
+  let wrap_with_temp f ~default_perm =
+    stage
+      (fun
+          ?in_dir
+          ?(on_cleanup_error = On_cleanup_error.Raise)
+          ?(perm = default_perm)
+          ?(prefix = "")
+          ?(suffix = "")
+          arg
+        ->
+         let in_dir =
+           Option.value_or_thunk in_dir ~default:(fun () -> force default_temp_dir)
+           |> make_absolute_under_cwd
+         in
+         f ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix arg)
+  ;;
+
   let with_temp_file ?in_dir =
-    unstage (wrap internal_with_temp_file ~default_perm:File_permissions.u_rw) ?in_dir
+    unstage
+      (wrap_with_temp internal_with_temp_file ~default_perm:File_permissions.u_rw)
+      ?in_dir
   ;;
 
   let with_temp_dir ?in_dir =
-    unstage (wrap internal_with_temp_dir ~default_perm:File_permissions.u_rwx) ?in_dir
+    unstage
+      (wrap_with_temp internal_with_temp_dir ~default_perm:File_permissions.u_rwx)
+      ?in_dir
   ;;
 
   let within_temp_dir ?in_dir =
-    unstage (wrap internal_within_temp_dir ~default_perm:File_permissions.u_rwx) ?in_dir
+    unstage
+      (wrap_with_temp internal_within_temp_dir ~default_perm:File_permissions.u_rwx)
+      ?in_dir
   ;;
 end
 
@@ -407,7 +441,7 @@ include struct
 
   let funlock { fd; close_upon_funlock } =
     match close_upon_funlock with
-    | true -> Core_unix.close fd ~restart:true
+    | true -> Core_unix.close fd
     | false -> Core_unix.flock_blocking fd Core_unix.Flock_command.unlock
   ;;
 

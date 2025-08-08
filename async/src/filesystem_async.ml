@@ -1,6 +1,7 @@
 open! Core
 open! Async_kernel
 open! Async_unix
+open! Async_log_kernel.Ppx_log_syntax
 include Filesystem_types
 
 open struct
@@ -206,29 +207,50 @@ include struct
            suffix))
   ;;
 
-  let internal_with_temp_file ~in_dir ~perm ~prefix ~suffix f =
-    let%bind path = internal_create_temp_file ~in_dir ~perm ~prefix ~suffix () in
+  let with_cleanup ~on_cleanup_error path ~f ~cleanup =
     Monitor.protect
       (fun () -> f path)
       ~finally:(fun () ->
-        (* delete the temp file, ok if it was already deleted *)
-        match%map
-          Monitor.try_with ~extract_exn:true (fun () ->
-            unlink (File_path.of_absolute path))
-        with
-        | Ok () | Error (Unix.Unix_error (ENOENT, _, _)) -> ()
-        | Error exn -> Exn.reraise exn "error cleaning up temporary file")
+        match%bind Monitor.try_with (fun () -> cleanup path) with
+        | Ok () -> return ()
+        | Error exn ->
+          let exn, backtrace =
+            match exn with
+            | Monitor.Monitor_exn monitor_exn ->
+              ( Monitor.Monitor_exn.extract_exn monitor_exn
+              , Monitor.Monitor_exn.backtrace monitor_exn )
+            | _ -> exn, None
+          in
+          On_cleanup_error.on_cleanup_error
+            on_cleanup_error
+            ~backtrace
+            ~exn
+            ~log_s:(fun sexp ->
+              [%log.global.error_sexp sexp];
+              return ())
+            ~path
+            ~return)
   ;;
 
-  let internal_with_temp_dir ~in_dir ~perm ~prefix ~suffix f =
+  let internal_with_temp_file ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix f =
+    let%bind path = internal_create_temp_file ~in_dir ~perm ~prefix ~suffix () in
+    with_cleanup ~on_cleanup_error path ~f ~cleanup:(fun path ->
+      (* delete the temp file, ok if it was already deleted *)
+      match%bind
+        Monitor.try_with ~extract_exn:true (fun () -> unlink (File_path.of_absolute path))
+      with
+      | Ok () | Error (Unix.Unix_error (ENOENT, _, _)) -> return ()
+      | Error exn -> Exn.reraise exn "error deleting temporary file")
+  ;;
+
+  let internal_with_temp_dir ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix f =
     let%bind path = internal_create_temp_dir ~in_dir ~perm ~prefix ~suffix () in
-    Monitor.protect
-      (fun () -> f path)
-      ~finally:(fun () -> File_path.of_absolute path |> rm ~recursive:true)
+    with_cleanup ~on_cleanup_error path ~f ~cleanup:(fun path ->
+      File_path.of_absolute path |> rm ~recursive:true)
   ;;
 
-  let internal_within_temp_dir ~in_dir ~perm ~prefix ~suffix f =
-    internal_with_temp_dir ~in_dir ~perm ~prefix ~suffix (fun path ->
+  let internal_within_temp_dir ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix f =
+    internal_with_temp_dir ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix (fun path ->
       let%bind prev = getcwd () in
       let%bind () = chdir (File_path.of_absolute path) in
       Monitor.protect f ~finally:(fun () ->
@@ -239,18 +261,11 @@ include struct
   (* We wrap the internal functions with optional arguments uniformly. *)
 
   let wrap f ~default_perm =
-    stage (fun ?in_dir ?perm ?prefix ?suffix arg ->
+    stage (fun ?in_dir ?(perm = default_perm) ?(prefix = "") ?(suffix = "") arg ->
       let%bind in_dir =
-        let path =
-          match in_dir with
-          | Some dir -> dir
-          | None -> force default_temp_dir
-        in
-        make_absolute_under_cwd path
+        Option.value_or_thunk in_dir ~default:(fun () -> force default_temp_dir)
+        |> make_absolute_under_cwd
       in
-      let perm = Option.value perm ~default:default_perm in
-      let prefix = Option.value prefix ~default:"" in
-      let suffix = Option.value suffix ~default:"" in
       f ~in_dir ~perm ~prefix ~suffix arg)
   ;;
 
@@ -264,16 +279,39 @@ include struct
 
   (* We have to eta-expand the polymorphic functions. *)
 
+  let wrap_with_temp f ~default_perm =
+    stage
+      (fun
+          ?in_dir
+          ?(on_cleanup_error = On_cleanup_error.Raise)
+          ?(perm = default_perm)
+          ?(prefix = "")
+          ?(suffix = "")
+          arg
+        ->
+         let%bind in_dir =
+           Option.value_or_thunk in_dir ~default:(fun () -> force default_temp_dir)
+           |> make_absolute_under_cwd
+         in
+         f ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix arg)
+  ;;
+
   let with_temp_file ?in_dir =
-    unstage (wrap internal_with_temp_file ~default_perm:File_permissions.u_rw) ?in_dir
+    unstage
+      (wrap_with_temp internal_with_temp_file ~default_perm:File_permissions.u_rw)
+      ?in_dir
   ;;
 
   let with_temp_dir ?in_dir =
-    unstage (wrap internal_with_temp_dir ~default_perm:File_permissions.u_rwx) ?in_dir
+    unstage
+      (wrap_with_temp internal_with_temp_dir ~default_perm:File_permissions.u_rwx)
+      ?in_dir
   ;;
 
   let within_temp_dir ?in_dir =
-    unstage (wrap internal_within_temp_dir ~default_perm:File_permissions.u_rwx) ?in_dir
+    unstage
+      (wrap_with_temp internal_within_temp_dir ~default_perm:File_permissions.u_rwx)
+      ?in_dir
   ;;
 end
 

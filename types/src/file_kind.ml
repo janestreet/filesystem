@@ -9,7 +9,7 @@ type t =
   | Regular
   | Socket
   | Symlink
-[@@deriving compare, enumerate, equal, hash, quickcheck, sexp_of]
+[@@deriving compare ~localize, enumerate, equal ~localize, hash, quickcheck, sexp_of]
 
 let to_unix_file_kind : t -> Core_unix.file_kind = function
   | Block_device -> S_BLK
