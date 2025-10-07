@@ -1,7 +1,7 @@
 open! Core
 include File_permissions_intf
 
-type t = { perm : int } [@@unboxed] [@@deriving compare, equal, hash]
+type t = { perm : int } [@@unboxed] [@@deriving compare ~localize, equal ~localize, hash]
 
 let mask = 0o7777
 let is_ok int = int land mask = int

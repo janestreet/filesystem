@@ -3,7 +3,8 @@ open Expect_test_helpers_core
 open Filesystem_types
 open File_permissions.Operators
 
-type t = File_permissions.t [@@deriving compare, equal, hash, quickcheck, sexp_of]
+type t = File_permissions.t
+[@@deriving compare ~localize, equal ~localize, hash, quickcheck, sexp_of]
 
 open struct
   (** As we re-export defined constants, record them for use as examples. *)
@@ -172,10 +173,8 @@ let%expect_test "[to_int] / [of_int_exn]" =
 let is_empty = File_permissions.is_empty
 
 let%expect_test "[is_empty]" =
-  quickcheck_m
-    (module File_permissions)
-    ~examples
-    ~f:(fun t -> require (Bool.equal (is_empty t) (to_int t = 0)));
+  quickcheck_m (module File_permissions) ~examples ~f:(fun t ->
+    require (Bool.equal (is_empty t) (to_int t = 0)));
   [%expect {| |}]
 ;;
 
@@ -183,20 +182,17 @@ module Operators = struct
   let ( lxor ) = File_permissions.( lxor )
 
   let%expect_test "[lxor]" =
-    quickcheck_m
-      (module File_permissions)
-      ~examples
-      ~f:(fun t ->
-        require_equal (module File_permissions) (t lxor t) empty;
-        require_equal (module File_permissions) (t lxor empty) t;
-        require_equal
-          (module File_permissions)
-          (t lor (all_including_special_mode_bits lxor t))
-          all_including_special_mode_bits;
-        require_equal
-          (module File_permissions)
-          (t land (all_including_special_mode_bits lxor t))
-          empty);
+    quickcheck_m (module File_permissions) ~examples ~f:(fun t ->
+      require_equal (module File_permissions) (t lxor t) empty;
+      require_equal (module File_permissions) (t lxor empty) t;
+      require_equal
+        (module File_permissions)
+        (t lor (all_including_special_mode_bits lxor t))
+        all_including_special_mode_bits;
+      require_equal
+        (module File_permissions)
+        (t land (all_including_special_mode_bits lxor t))
+        empty);
     [%expect {| |}];
     quickcheck_m
       (module struct
@@ -209,13 +205,10 @@ module Operators = struct
   let ( land ) = File_permissions.( land )
 
   let%expect_test "[land]" =
-    quickcheck_m
-      (module File_permissions)
-      ~examples
-      ~f:(fun t ->
-        require_equal (module File_permissions) (t land t) t;
-        require_equal (module File_permissions) (t land empty) empty;
-        require_equal (module File_permissions) (t land all_including_special_mode_bits) t);
+    quickcheck_m (module File_permissions) ~examples ~f:(fun t ->
+      require_equal (module File_permissions) (t land t) t;
+      require_equal (module File_permissions) (t land empty) empty;
+      require_equal (module File_permissions) (t land all_including_special_mode_bits) t);
     [%expect {| |}];
     quickcheck_m
       (module struct
@@ -228,16 +221,13 @@ module Operators = struct
   let ( lor ) = File_permissions.( lor )
 
   let%expect_test "[lor]" =
-    quickcheck_m
-      (module File_permissions)
-      ~examples
-      ~f:(fun t ->
-        require_equal (module File_permissions) (t lor t) t;
-        require_equal (module File_permissions) (t lor empty) t;
-        require_equal
-          (module File_permissions)
-          (t lor all_including_special_mode_bits)
-          all_including_special_mode_bits);
+    quickcheck_m (module File_permissions) ~examples ~f:(fun t ->
+      require_equal (module File_permissions) (t lor t) t;
+      require_equal (module File_permissions) (t lor empty) t;
+      require_equal
+        (module File_permissions)
+        (t lor all_including_special_mode_bits)
+        all_including_special_mode_bits);
     [%expect {| |}];
     quickcheck_m
       (module struct
@@ -264,16 +254,13 @@ let%expect_test "[intersection] and [union] and [symmetric_diff]" =
 let do_intersect = File_permissions.do_intersect
 
 let%expect_test "[do_intersect]" =
-  quickcheck_m
-    (module File_permissions)
-    ~examples
-    ~f:(fun t ->
-      require (not (do_intersect t empty));
-      require_equal (module Bool) (do_intersect t t) (not (is_empty t));
-      require_equal
-        (module Bool)
-        (do_intersect t all_including_special_mode_bits)
-        (not (is_empty t)));
+  quickcheck_m (module File_permissions) ~examples ~f:(fun t ->
+    require (not (do_intersect t empty));
+    require_equal (module Bool) (do_intersect t t) (not (is_empty t));
+    require_equal
+      (module Bool)
+      (do_intersect t all_including_special_mode_bits)
+      (not (is_empty t)));
   [%expect {| |}];
   quickcheck_m
     (module struct
@@ -289,13 +276,10 @@ let%expect_test "[do_intersect]" =
 let is_subset = File_permissions.is_subset
 
 let%expect_test "[is_subset]" =
-  quickcheck_m
-    (module File_permissions)
-    ~examples
-    ~f:(fun t ->
-      require (is_subset t ~of_:t);
-      require (Bool.equal (is_empty t) (is_subset t ~of_:empty));
-      require (is_subset t ~of_:all_including_special_mode_bits));
+  quickcheck_m (module File_permissions) ~examples ~f:(fun t ->
+    require (is_subset t ~of_:t);
+    require (Bool.equal (is_empty t) (is_subset t ~of_:empty));
+    require (is_subset t ~of_:all_including_special_mode_bits));
   [%expect {| |}];
   quickcheck_m
     (module struct

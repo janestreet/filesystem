@@ -19,7 +19,7 @@ module type S = sig
     ; modify_time : Time_ns.t
     ; status_time : Time_ns.t
     }
-  [@@deriving equal, quickcheck, sexp_of]
+  [@@deriving equal ~localize, quickcheck, sexp_of]
 
   (** Conversions *)
 

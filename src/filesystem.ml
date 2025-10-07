@@ -185,6 +185,7 @@ module type S = sig
       by the same name, and this function may attempt to delete that. *)
   val within_temp_dir
     :  ?in_dir:File_path.t (** default [force default_temp_dir] *)
+    -> ?on_cleanup_error:unit IO.t On_cleanup_error.t (** default [Raise] *)
     -> ?perm:File_permissions.t (** default [u_rwx] *)
     -> ?prefix:string (** default [""] *)
     -> ?suffix:string (** default [""] *)
@@ -199,6 +200,7 @@ module type S = sig
       before the function finishes. *)
   val with_temp_dir
     :  ?in_dir:File_path.t (** default [force default_temp_dir] *)
+    -> ?on_cleanup_error:unit IO.t On_cleanup_error.t (** default [Raise] *)
     -> ?perm:File_permissions.t (** default [u_rwx] *)
     -> ?prefix:string (** default [""] *)
     -> ?suffix:string (** default [""] *)
@@ -213,6 +215,7 @@ module type S = sig
       else to it should not have the same race condition. *)
   val with_temp_file
     :  ?in_dir:File_path.t (** default [force default_temp_dir] *)
+    -> ?on_cleanup_error:unit IO.t On_cleanup_error.t (** default [Raise] *)
     -> ?perm:File_permissions.t (** default [u_rw] *)
     -> ?prefix:string (** default [""] *)
     -> ?suffix:string (** default [""] *)
