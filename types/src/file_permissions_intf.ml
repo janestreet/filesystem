@@ -17,7 +17,13 @@ end
 module type S = sig
   (** Represents unix file permissions. *)
   type t
-  [@@deriving compare ~localize, equal ~localize, hash, quickcheck, sexp_of] [@@immediate]
+  [@@deriving
+    compare ~portable ~localize
+    , equal ~portable ~localize
+    , hash ~portable
+    , quickcheck ~portable
+    , sexp_of ~portable]
+  [@@immediate]
 
   (** {2 Constants} *)
 
