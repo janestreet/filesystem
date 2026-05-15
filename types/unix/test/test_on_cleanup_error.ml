@@ -1,5 +1,5 @@
 open! Core
-open Filesystem_types
+open Filesystem_types_unix
 open Expect_test_helpers_core
 
 include (
