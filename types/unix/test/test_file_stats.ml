@@ -1,6 +1,6 @@
 open! Core
 open Expect_test_helpers_core
-open Filesystem_types
+open Filesystem_types_unix
 
 include struct
   type t = File_stats.t [@@deriving equal ~localize, quickcheck, sexp_of]
@@ -15,28 +15,32 @@ type t = File_stats.t =
   ; user_id : int
   ; group_id : int
   ; file_device : int
-  ; size : Int63.t
+  ; size : int64#
   ; access_time : Time_ns.t
   ; modify_time : Time_ns.t
   ; status_time : Time_ns.t
   }
 
+open struct
+  let example =
+    { host_device = 100
+    ; inode = 200
+    ; kind = Symlink
+    ; permissions = File_permissions.ugo_r
+    ; hard_links = 300
+    ; user_id = 400
+    ; group_id = 500
+    ; file_device = 600
+    ; size = #700L
+    ; access_time = Time_ns_unix.epoch
+    ; modify_time = Time_ns_unix.epoch
+    ; status_time = Time_ns_unix.epoch
+    }
+  ;;
+end
+
 let%expect_test "[sexp_of_t]" =
-  print_s
-    (sexp_of_t
-       { host_device = 100
-       ; inode = 200
-       ; kind = Symlink
-       ; permissions = File_permissions.ugo_r
-       ; hard_links = 300
-       ; user_id = 400
-       ; group_id = 500
-       ; file_device = 600
-       ; size = Int63.of_int 700
-       ; access_time = Time_ns_unix.epoch
-       ; modify_time = Time_ns_unix.epoch
-       ; status_time = Time_ns_unix.epoch
-       });
+  print_s (sexp_of_t example);
   [%expect
     {|
     ((host_device <hidden>)
@@ -52,6 +56,25 @@ let%expect_test "[sexp_of_t]" =
      (modify_time <hidden>)
      (status_time <hidden>))
     |}]
+;;
+
+let size_in_byte_units_exn = File_stats.size_in_byte_units_exn
+
+let%expect_test "[size_in_byte_units_exn]" =
+  let test size =
+    print_s [%sexp (size_in_byte_units_exn { example with size } : Byte_units.t)]
+  in
+  test #2L;
+  [%expect {| 2B |}];
+  test #2_000L;
+  [%expect {| 1.953125K |}];
+  test #2_000_000L;
+  [%expect {| 1.907348633M |}];
+  test #2_000_000_000L;
+  [%expect {| 1.862645149231G |}];
+  test #2_000_000_000_000L;
+  [%expect {| 1862.645149231G |}];
+  ()
 ;;
 
 open struct

@@ -1,6 +1,6 @@
 open! Core
 open Expect_test_helpers_core
-open Filesystem_types
+open Filesystem_types_unix
 open File_permissions.Operators
 
 type t = File_permissions.t
