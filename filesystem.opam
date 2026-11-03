@@ -15,6 +15,7 @@ depends: [
   "async_kernel"
   "async_log"
   "async_unix"
+  "basement"
   "core"
   "core_unix"
   "file_path"

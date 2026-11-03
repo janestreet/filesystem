@@ -9,13 +9,7 @@ type t =
   | Regular
   | Socket
   | Symlink
-[@@deriving
-  compare ~portable ~localize
-  , enumerate
-  , equal ~portable ~localize
-  , hash ~portable
-  , quickcheck ~portable
-  , sexp_of ~portable]
+[@@deriving compare, enumerate, equal, hash, quickcheck, sexp_of]
 
 let to_async_file_kind = function
   | Block_device -> `Block

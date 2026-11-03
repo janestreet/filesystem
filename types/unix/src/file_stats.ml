@@ -1,4 +1,5 @@
 open! Core
+open! Basement.Primitives
 include Filesystem_types.File_stats
 include File_stats_intf
 module File_permissions = Filesystem_types.File_permissions

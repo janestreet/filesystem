@@ -1,4 +1,5 @@
 open! Core
+open Basement.Primitives
 
 module type S = sig
   module File_kind : T
@@ -14,12 +15,12 @@ module type S = sig
     ; user_id : int
     ; group_id : int
     ; file_device : int
-    ; size : int64
+    ; size : Int64_u.t
     ; access_time : Time_ns.t
     ; modify_time : Time_ns.t
     ; status_time : Time_ns.t
     }
-  [@@deriving equal ~portable ~localize, quickcheck ~portable, sexp_of ~portable]
+  [@@deriving equal, quickcheck, sexp_of]
 
   (** Accessors *)
 

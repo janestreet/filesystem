@@ -3,8 +3,7 @@ open Expect_test_helpers_core
 open Filesystem_types_unix
 open File_permissions.Operators
 
-type t = File_permissions.t
-[@@deriving compare ~localize, equal ~localize, hash, quickcheck, sexp_of]
+type t = File_permissions.t [@@deriving compare, equal, hash, quickcheck, sexp_of]
 
 open struct
   (** As we re-export defined constants, record them for use as examples. *)

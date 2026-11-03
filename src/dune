@@ -3,4 +3,4 @@
  (public_name filesystem)
  (libraries core file_path filesystem_types_unix)
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_jane -compare-require-explicit-locality)))

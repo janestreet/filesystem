@@ -47,7 +47,7 @@ module Test_filesystem
     require_equal
       (module String)
       Sys.executable_name
-      (File_path.to_string (force Fs.executable_name));
+      (File_path.to_string (Portable_lazy.force Fs.executable_name));
     [%expect {| |}];
     return ()
   ;;
@@ -58,7 +58,7 @@ module Test_filesystem
     require_equal
       (module String)
       Filename.temp_dir_name
-      (File_path.to_string (force Fs.default_temp_dir));
+      (File_path.to_string (Portable_lazy.force Fs.default_temp_dir));
     [%expect {| |}];
     return ()
   ;;

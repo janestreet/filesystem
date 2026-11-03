@@ -2,14 +2,15 @@ open! Core
 open! Async_kernel
 open! Async_unix
 open! Async_log_kernel.Ppx_log_syntax
+open! Basement.Primitives
 include Filesystem_types_unix
 
 open struct
   let time_ns_to_float time_ns = Time_ns.Span.to_sec (Time_ns.to_span_since_epoch time_ns)
 end
 
-let executable_name = lazy (File_path.of_string Sys.executable_name)
-let default_temp_dir = lazy (File_path.of_string Filename.temp_dir_name)
+let executable_name = lazy%portable (File_path.of_string Sys.executable_name)
+let default_temp_dir = lazy%portable (File_path.of_string Filename.temp_dir_name)
 
 include struct
   (* [Filename] wrappers. *)
@@ -265,7 +266,8 @@ include struct
   let wrap f ~default_perm =
     stage (fun ?in_dir ?(perm = default_perm) ?(prefix = "") ?(suffix = "") arg ->
       let%bind in_dir =
-        Option.value_or_thunk in_dir ~default:(fun () -> force default_temp_dir)
+        Option.value_or_thunk in_dir ~default:(fun () ->
+          Portable_lazy.force default_temp_dir)
         |> make_absolute_under_cwd
       in
       f ~in_dir ~perm ~prefix ~suffix arg)
@@ -292,7 +294,8 @@ include struct
           arg
         ->
          let%bind in_dir =
-           Option.value_or_thunk in_dir ~default:(fun () -> force default_temp_dir)
+           Option.value_or_thunk in_dir ~default:(fun () ->
+             Portable_lazy.force default_temp_dir)
            |> make_absolute_under_cwd
          in
          f ~in_dir ~on_cleanup_error ~perm ~prefix ~suffix arg)
