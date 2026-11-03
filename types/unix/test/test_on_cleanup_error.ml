@@ -5,6 +5,7 @@ open Expect_test_helpers_core
 include (
   On_cleanup_error :
   sig
+  @@ portable
     type 'return t = 'return On_cleanup_error.t =
       | Call of (exn -> 'return)
       | Ignore

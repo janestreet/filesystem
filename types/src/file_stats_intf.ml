@@ -1,4 +1,5 @@
 open! Core
+open Basement.Primitives
 
 module type S = sig @@ portable
   module File_kind : T
@@ -14,7 +15,7 @@ module type S = sig @@ portable
     ; user_id : int
     ; group_id : int
     ; file_device : int
-    ; size : int64#
+    ; size : Int64_u.t
     ; access_time : Time_ns.t
     ; modify_time : Time_ns.t
     ; status_time : Time_ns.t

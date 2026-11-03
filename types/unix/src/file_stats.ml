@@ -1,4 +1,5 @@
 open! Core
+open! Basement.Primitives
 include Filesystem_types.File_stats
 include File_stats_intf
 module File_permissions = Filesystem_types.File_permissions
@@ -6,11 +7,15 @@ module File_permissions = Filesystem_types.File_permissions
 module Int64_u = struct
   external of_int64
     :  (int64[@local_opt])
-    -> (int64#[@unboxed])
+    -> (Int64_u.t[@unboxed])
     @@ portable
     = "%unbox_int64"
 
-  external to_int64 : (int64#[@unboxed]) -> (int64[@local_opt]) @@ portable = "%box_int64"
+  external to_int64
+    :  (Int64_u.t[@unboxed])
+    -> (int64[@local_opt])
+    @@ portable
+    = "%box_int64"
 end
 
 let to_unix_stats

@@ -1,6 +1,6 @@
 open! Core
 
-module type S = sig
+module type S = sig @@ portable
   type 'return t =
     | Call of (exn -> 'return)
     | Ignore

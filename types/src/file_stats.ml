@@ -1,16 +1,21 @@
 open! Core
+open! Basement.Primitives
 include File_stats_intf
 
 module Int64_u = struct
-  type t = int64#
+  type t = Int64_u.t
 
   external of_int64
     :  (int64[@local_opt])
-    -> (int64#[@unboxed])
+    -> (Int64_u.t[@unboxed])
     @@ portable
     = "%unbox_int64"
 
-  external to_int64 : (int64#[@unboxed]) -> (int64[@local_opt]) @@ portable = "%box_int64"
+  external to_int64
+    :  (Int64_u.t[@unboxed])
+    -> (int64[@local_opt])
+    @@ portable
+    = "%box_int64"
 
   let sexp_of_t t = Int64.sexp_of_t (to_int64 t)
 

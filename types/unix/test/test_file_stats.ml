@@ -1,6 +1,7 @@
 open! Core
 open Expect_test_helpers_core
 open Filesystem_types_unix
+open Basement.Primitives
 
 include struct
   type t = File_stats.t [@@deriving equal ~localize, quickcheck, sexp_of]
@@ -15,7 +16,7 @@ type t = File_stats.t =
   ; user_id : int
   ; group_id : int
   ; file_device : int
-  ; size : int64#
+  ; size : Int64_u.t
   ; access_time : Time_ns.t
   ; modify_time : Time_ns.t
   ; status_time : Time_ns.t

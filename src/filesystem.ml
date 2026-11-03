@@ -11,7 +11,7 @@ module type S = sig
   (** The currently running executable.
 
       OCaml semantics do not guarantee an absolute path here. *)
-  val executable_name : File_path.t Lazy.t
+  val executable_name : File_path.t Portable_lazy.t
 
   (** {2 File I/O Wrappers}
 
@@ -174,7 +174,7 @@ module type S = sig
 
       Has the same value as {!Core.Filename.temp_dir_name}. OCaml semantics do not
       guarantee an absolute path here. *)
-  val default_temp_dir : File_path.t Lazy.t
+  val default_temp_dir : File_path.t Portable_lazy.t
 
   (** Creates a new directory with a unique name, [chdir]s to it, runs the given function,
       [chdir]s back, and then recursively deletes the temporary directory and its
